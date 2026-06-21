@@ -11,7 +11,9 @@ export interface ProfilePreferences {
 export class Profile {
   id: string;
   name: string;
+  username?: string;
   email: string;
+  phoneNumber?: string;
   preferences: ProfilePreferences;
   createdAt: Date;
   updatedAt: Date;
