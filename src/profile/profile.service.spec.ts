@@ -50,7 +50,9 @@ describe('ProfileService', () => {
   it('should update a profile', () => {
     const dto: CreateProfileDto = {
       name: 'John Doe',
+      username: 'johndoe',
       email: 'john@example.com',
+      phoneNumber: '+56912345678',
       preferences: {
         genres: ['Rock'],
         location: {
@@ -62,8 +64,14 @@ describe('ProfileService', () => {
     };
 
     const created = service.create(dto);
+    expect(created.username).toBe('johndoe');
+    expect(created.phoneNumber).toBe('+56912345678');
+
     const updated = service.update(created.id, {
       name: 'John Smith',
+      username: 'johnsmith',
+      email: 'john.smith@example.com',
+      phoneNumber: '+56987654321',
       preferences: {
         genres: ['Rock', 'Pop'],
         location: {
@@ -74,6 +82,9 @@ describe('ProfileService', () => {
       },
     });
     expect(updated.name).toBe('John Smith');
+    expect(updated.username).toBe('johnsmith');
+    expect(updated.email).toBe('john.smith@example.com');
+    expect(updated.phoneNumber).toBe('+56987654321');
     expect(updated.preferences.genres).toContain('Pop');
   });
 

@@ -7,9 +7,17 @@ export class UpdateProfileDto {
   @IsOptional()
   name?: string;
 
+  @IsString()
+  @IsOptional()
+  username?: string;
+
   @IsEmail()
   @IsOptional()
   email?: string;
+
+  @IsString()
+  @IsOptional()
+  phoneNumber?: string;
 
   @ValidateNested()
   @Type(() => PreferencesDto)

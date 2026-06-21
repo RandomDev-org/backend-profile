@@ -37,9 +37,17 @@ export class CreateProfileDto {
   @IsNotEmpty()
   name: string;
 
+  @IsString()
+  @IsOptional()
+  username?: string;
+
   @IsEmail()
   @IsNotEmpty()
   email: string;
+
+  @IsString()
+  @IsOptional()
+  phoneNumber?: string;
 
   @ValidateNested()
   @Type(() => PreferencesDto)
