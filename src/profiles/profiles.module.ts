@@ -1,11 +1,21 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { ClientsModule, Transport } from '@nestjs/microservices';
 import { ProfilesController } from './profiles.controller';
 import { ProfilesService } from './profiles.service';
-import { UserPreference } from './entities/user-preference.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([UserPreference])],
+  imports: [
+    ClientsModule.register([
+      {
+        name: 'DB_SERVICE',
+        transport: Transport.TCP,
+        options: {
+          host: process.env.DB_SERVICE_HOST ?? 'localhost',
+          port: parseInt(process.env.DB_SERVICE_PORT ?? '4003'),
+        },
+      },
+    ]),
+  ],
   controllers: [ProfilesController],
   providers: [ProfilesService],
   exports: [ProfilesService],

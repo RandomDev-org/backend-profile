@@ -2,92 +2,51 @@
 
 ## Descripción
 
-Implementación del módulo `ProfilesModule` para el microservicio de perfiles. Este módulo permite gestionar las preferencias de usuario (géneros musicales, ubicación y tipos de evento) que serán utilizadas para filtrar eventos en el mapa interactivo.
+Implementación del módulo `ProfilesModule` para el microservicio de perfiles. Permite gestionar las preferencias de usuario (géneros musicales, ubicación y tipos de evento) utilizadas para filtrar eventos en el mapa interactivo.
 
-## Endpoints implementados
+La comunicación entre microservicios se realiza mediante **TCP** (NestJS microservices). Este servicio se conecta al API Gateway por TCP y también expone HTTP para desarrollo local.
 
+## Endpoints
+
+### HTTP (desarrollo local)
 | Método | Ruta | Descripción |
 |--------|------|-------------|
-| `GET` | `/profiles/:userId/preferences` | Obtiene las preferencias de un usuario |
-| `PUT` | `/profiles/:userId/preferences` | Crea o actualiza las preferencias de un usuario |
+| `GET` | `/profiles/:userId/preferences` | Obtiene preferencias de un usuario |
+| `PUT` | `/profiles/:userId/preferences` | Crea o actualiza preferencias |
 
-### Ejemplos de uso
+### TCP (API Gateway)
+| Pattern | Payload | Descripción |
+|---------|---------|-------------|
+| `{ cmd: 'get_user_preferences' }` | `{ userId: string }` | Obtiene preferencias |
+| `{ cmd: 'update_user_preferences' }` | `{ userId, preferredGenres, ... }` | Actualiza preferencias |
 
-**Crear/actualizar preferencias:**
-```json
-PUT /profiles/user123/preferences
-{
-  "preferredGenres": ["Rock", "Jazz"],
-  "preferredLocation": "Santiago",
-  "latitude": -33.4489,
-  "longitude": -70.6693,
-  "preferredEventTypes": ["concierto", "tocata"]
-}
-```
-
-**Respuesta:**
-```json
-{
-  "id": 1,
-  "userId": "user123",
-  "preferredGenres": ["Rock", "Jazz"],
-  "preferredLocation": "Santiago",
-  "latitude": -33.4489,
-  "longitude": -70.6693,
-  "preferredEventTypes": ["concierto", "tocata"],
-  "createdAt": "2026-06-21T23:18:10.000Z",
-  "updatedAt": "2026-06-21T23:18:10.000Z"
-}
-```
-
-## Entidad: UserPreference
-
-| Campo | Tipo | Descripción |
-|-------|------|-------------|
-| `id` | `number` (PK) | Identificador único |
-| `userId` | `string` (unique) | ID del usuario |
-| `preferredGenres` | `string[]` (JSON) | Géneros musicales preferidos |
-| `preferredLocation` | `string` | Nombre de la ubicación |
-| `latitude` | `float` (nullable) | Latitud de la ubicación |
-| `longitude` | `float` (nullable) | Longitud de la ubicación |
-| `preferredEventTypes` | `string[]` (JSON) | Tipos de evento preferidos |
-| `createdAt` | `Date` | Fecha de creación |
-| `updatedAt` | `Date` | Fecha de actualización |
-
-## Tecnologías agregadas
-
-- **TypeORM** + **better-sqlite3** — Persistencia de datos (SQLite para desarrollo local)
-- **class-validator** / **class-transformer** — Validación y transformación de DTOs
-- **ValidationPipe** global con `whitelist: true` — Seguridad y sanitización de entrada
-
-## Estructura del módulo
+## Arquitectura
 
 ```
-src/profiles/
-├── entities/
-│   └── user-preference.entity.ts
-├── dto/
-│   └── update-preferences.dto.ts
-├── profiles.module.ts
-├── profiles.controller.ts
-└── profiles.service.ts
+API Gateway (TCP) ←→ Profile Service (TCP:4002) ←→ DB Service (TCP:4003)
+                         ↕
+                   HTTP :3000 (dev)
 ```
 
-## Pendiente: Integración con microservicio "maps"
-
-Los siguientes endpoints de búsqueda de eventos quedan como **TODO** hasta integrar el microservicio "maps" vía API Gateway:
-
-- `GET /profiles/events/search?genre=&eventType=&latitude=&longitude=&radiusKm=`
-- `GET /profiles/events`
-
-El método `ProfilesService.searchEvents()` contiene un TODO con la especificación del endpoint esperado del microservicio `maps`.
+- **Profile Service** recibe mensajes TCP desde el Gateway y responde vía TCP
+- Para persistencia, envía mensajes TCP al **DB Service** (`{ cmd: 'get_preferences' }` / `{ cmd: 'upsert_preferences' }`)
+- Variables de entorno: `PROFILES_TCP_PORT`, `DB_SERVICE_HOST`, `DB_SERVICE_PORT`
 
 ## Cómo ejecutar
 
 ```bash
 npm install
 npm run build
+# Iniciar (requiere DB Service corriendo en TCP:4003)
 npm run start:dev
 ```
 
-El servidor se levanta en `http://localhost:3000`. La base de datos SQLite se crea automáticamente en `data/profile.db`.
+## Variables de entorno
+
+| Variable | Default | Descripción |
+|----------|---------|-------------|
+| `PORT` | `3000` | Puerto HTTP local |
+| `PROFILES_HOST` | `0.0.0.0` | Host TCP |
+| `PROFILES_TCP_PORT` | `4002` | Puerto TCP para Gateway |
+| `DB_SERVICE_HOST` | `localhost` | Host del DB Service |
+| `DB_SERVICE_PORT` | `4003` | Puerto del DB Service |

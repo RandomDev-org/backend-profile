@@ -1,4 +1,5 @@
 import { Controller, Get, Put, Param, Body } from '@nestjs/common';
+import { MessagePattern } from '@nestjs/microservices';
 import { ProfilesService } from './profiles.service';
 import { UpdatePreferencesDto } from './dto/update-preferences.dto';
 
@@ -18,9 +19,15 @@ export class ProfilesController {
   ) {
     return this.profilesService.updatePreferences(userId, dto);
   }
-}
 
-// TODO: Endpoints de búsqueda de eventos serán implementados cuando se integre
-// el microservicio "maps" vía API Gateway:
-//   GET /profiles/events/search?genre=&eventType=&latitude=&longitude=&radiusKm=
-//   GET /profiles/events
+  @MessagePattern({ cmd: 'get_user_preferences' })
+  getPreferencesTcp(data: { userId: string }) {
+    return this.profilesService.getPreferences(data.userId);
+  }
+
+  @MessagePattern({ cmd: 'update_user_preferences' })
+  updatePreferencesTcp(data: { userId: string } & UpdatePreferencesDto) {
+    const { userId, ...dto } = data;
+    return this.profilesService.updatePreferences(userId, dto);
+  }
+}

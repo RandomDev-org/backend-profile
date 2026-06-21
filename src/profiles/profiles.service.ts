@@ -1,53 +1,79 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { UserPreference } from './entities/user-preference.entity';
+import {
+  Injectable,
+  Inject,
+  NotFoundException,
+  RequestTimeoutException,
+} from '@nestjs/common';
+import { ClientProxy } from '@nestjs/microservices';
+import {
+  lastValueFrom,
+  timeout,
+  catchError,
+  throwError,
+  TimeoutError,
+} from 'rxjs';
 import { UpdatePreferencesDto } from './dto/update-preferences.dto';
+
+export interface UserPreferences {
+  userId: string;
+  preferredGenres?: string[];
+  preferredLocation?: string;
+  latitude?: number;
+  longitude?: number;
+  preferredEventTypes?: string[];
+}
 
 @Injectable()
 export class ProfilesService {
   constructor(
-    @InjectRepository(UserPreference)
-    private readonly preferenceRepo: Repository<UserPreference>,
+    @Inject('DB_SERVICE')
+    private readonly dbClient: ClientProxy,
   ) {}
 
-  async getPreferences(userId: string): Promise<UserPreference> {
-    const prefs = await this.preferenceRepo.findOne({ where: { userId } });
-    if (!prefs) {
-      throw new NotFoundException(`Preferences not found for user ${userId}`);
+  async getPreferences(userId: string): Promise<UserPreferences> {
+    try {
+      const prefs = await lastValueFrom(
+        this.dbClient
+          .send<UserPreferences>({ cmd: 'get_preferences' }, { userId })
+          .pipe(
+            timeout(5000),
+            catchError((err: unknown) => throwError(() => err)),
+          ),
+      );
+      if (!prefs) {
+        throw new NotFoundException(`Preferences not found for user ${userId}`);
+      }
+      return prefs;
+    } catch (err) {
+      if (err instanceof NotFoundException) throw err;
+      if (err instanceof TimeoutError) {
+        throw new RequestTimeoutException('DB service unavailable');
+      }
+      throw err;
     }
-    return prefs;
   }
 
   async updatePreferences(
     userId: string,
     dto: UpdatePreferencesDto,
-  ): Promise<UserPreference> {
-    let prefs = await this.preferenceRepo.findOne({ where: { userId } });
-    if (!prefs) {
-      prefs = this.preferenceRepo.create({ userId });
+  ): Promise<UserPreferences> {
+    try {
+      return await lastValueFrom(
+        this.dbClient
+          .send<UserPreferences>(
+            { cmd: 'upsert_preferences' },
+            { userId, ...dto },
+          )
+          .pipe(
+            timeout(5000),
+            catchError((err: unknown) => throwError(() => err)),
+          ),
+      );
+    } catch (err) {
+      if (err instanceof TimeoutError) {
+        throw new RequestTimeoutException('DB service unavailable');
+      }
+      throw err;
     }
-    if (dto.preferredGenres !== undefined) {
-      prefs.preferredGenres = dto.preferredGenres;
-    }
-    if (dto.preferredLocation !== undefined) {
-      prefs.preferredLocation = dto.preferredLocation;
-    }
-    if (dto.latitude !== undefined) {
-      prefs.latitude = dto.latitude;
-    }
-    if (dto.longitude !== undefined) {
-      prefs.longitude = dto.longitude;
-    }
-    if (dto.preferredEventTypes !== undefined) {
-      prefs.preferredEventTypes = dto.preferredEventTypes;
-    }
-    return this.preferenceRepo.save(prefs);
   }
-
-  // TODO: Integrar con microservicio "maps" a través de API Gateway
-  // Necesario para la búsqueda de eventos con filtros combinados:
-  //   - GET /maps/events/search?genre=&eventType=&latitude=&longitude=&radiusKm=
-  // El microservicio "maps" maneja toda la lógica de geolocalización y eventos.
-  // Este método deberá llamar al cliente HTTP del API Gateway y devolver los resultados.
 }
