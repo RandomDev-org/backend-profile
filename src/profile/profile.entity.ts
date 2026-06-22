@@ -36,6 +36,9 @@ export class Profile {
   @Column({ select: false })
   password: string;
 
+  @Column({ default: 'user' })
+  role: string;
+
   @Column({ type: 'simple-json' })
   preferences: ProfilePreferences;
 
