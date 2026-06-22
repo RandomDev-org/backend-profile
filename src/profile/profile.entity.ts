@@ -33,6 +33,9 @@ export class Profile {
   @Column({ nullable: true })
   phoneNumber: string;
 
+  @Column({ select: false })
+  password: string;
+
   @Column({ type: 'simple-json' })
   preferences: ProfilePreferences;
 
