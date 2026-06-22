@@ -1,18 +1,23 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { ProfilesController } from './profiles.controller';
 import { ProfilesService } from './profiles.service';
 
 @Module({
   imports: [
-    ClientsModule.register([
+    ClientsModule.registerAsync([
       {
-        name: 'DB_SERVICE',
-        transport: Transport.TCP,
-        options: {
-          host: process.env.DB_SERVICE_HOST ?? 'localhost',
-          port: parseInt(process.env.DB_SERVICE_PORT ?? '4003'),
-        },
+        name: 'MAPS_SERVICE',
+        imports: [ConfigModule],
+        inject: [ConfigService],
+        useFactory: (config: ConfigService) => ({
+          transport: Transport.TCP,
+          options: {
+            host: config.get<string>('MAPS_HOST', 'localhost'),
+            port: config.get<number>('MAPS_TCP_PORT', 4001),
+          },
+        }),
       },
     ]),
   ],
