@@ -11,5 +11,9 @@ export class CreateHistoryEntryDto {
 
   @IsOptional()
   @IsString()
+  genre?: string;
+
+  @IsOptional()
+  @IsString()
   notes?: string;
 }

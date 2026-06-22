@@ -1,23 +1,9 @@
-import { Injectable, Inject } from '@nestjs/common';
-import { ClientProxy } from '@nestjs/microservices';
-import {
-  lastValueFrom,
-  timeout,
-  catchError,
-  throwError,
-  TimeoutError,
-} from 'rxjs';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, FindOptionsWhere, Between } from 'typeorm';
+import { HistoryEntry } from './entities/history-entry.entity';
 import { CreateHistoryEntryDto } from './dto/create-history-entry.dto';
 import { HistoryQueryDto } from './dto/history-query.dto';
-
-export interface HistoryEntry {
-  id: string;
-  userId: string;
-  eventId: string;
-  role: 'attendee' | 'performer' | 'organizer';
-  notes?: string;
-  createdAt: string;
-}
 
 export interface HistoryStats {
   total: number;
@@ -28,88 +14,91 @@ export interface HistoryStats {
 @Injectable()
 export class HistoryService {
   constructor(
-    @Inject('MAPS_SERVICE')
-    private readonly mapsClient: ClientProxy,
+    @InjectRepository(HistoryEntry)
+    private readonly historyRepo: Repository<HistoryEntry>,
   ) {}
 
   async getUserHistory(
     userId: string,
     query: HistoryQueryDto,
   ): Promise<{ data: HistoryEntry[]; total: number }> {
-    try {
-      return await lastValueFrom(
-        this.mapsClient
-          .send<{
-            data: HistoryEntry[];
-            total: number;
-          }>({ cmd: 'get_user_history' }, { userId, ...query })
-          .pipe(
-            timeout(5000),
-            catchError((err: unknown) => throwError(() => err)),
-          ),
-      );
-    } catch (err) {
-      if (err instanceof TimeoutError) {
-        throw new Error('Maps service unavailable');
-      }
-      throw err;
+    const where: FindOptionsWhere<HistoryEntry> = { userId };
+
+    if (query.role) {
+      where.role = query.role;
     }
+
+    if (query.genre) {
+      where.genre = query.genre;
+    }
+
+    if (query.from || query.to) {
+      where.createdAt = Between(
+        query.from ? new Date(query.from) : new Date(0),
+        query.to ? new Date(query.to) : new Date(),
+      );
+    }
+
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+
+    const [data, total] = await this.historyRepo.findAndCount({
+      where,
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    return { data, total };
   }
 
   async addEntry(
     userId: string,
     dto: CreateHistoryEntryDto,
   ): Promise<HistoryEntry> {
-    try {
-      return await lastValueFrom(
-        this.mapsClient
-          .send<HistoryEntry>({ cmd: 'add_history_entry' }, { userId, ...dto })
-          .pipe(
-            timeout(5000),
-            catchError((err: unknown) => throwError(() => err)),
-          ),
-      );
-    } catch (err) {
-      if (err instanceof TimeoutError) {
-        throw new Error('Maps service unavailable');
-      }
-      throw err;
-    }
+    const entry = this.historyRepo.create({ userId, ...dto });
+    return this.historyRepo.save(entry);
   }
 
   async deleteEntry(userId: string, entryId: string): Promise<void> {
-    try {
-      await lastValueFrom(
-        this.mapsClient
-          .send<void>({ cmd: 'delete_history_entry' }, { userId, entryId })
-          .pipe(
-            timeout(5000),
-            catchError((err: unknown) => throwError(() => err)),
-          ),
-      );
-    } catch (err) {
-      if (err instanceof TimeoutError) {
-        throw new Error('Maps service unavailable');
-      }
-      throw err;
+    const result = await this.historyRepo.delete({ id: entryId, userId });
+    if (result.affected === 0) {
+      throw new NotFoundException(`History entry ${entryId} not found`);
     }
   }
 
   async getStats(userId: string): Promise<HistoryStats> {
-    try {
-      return await lastValueFrom(
-        this.mapsClient
-          .send<HistoryStats>({ cmd: 'get_user_history_stats' }, { userId })
-          .pipe(
-            timeout(5000),
-            catchError((err: unknown) => throwError(() => err)),
-          ),
-      );
-    } catch (err) {
-      if (err instanceof TimeoutError) {
-        throw new Error('Maps service unavailable');
-      }
-      throw err;
+    const total = await this.historyRepo.count({ where: { userId } });
+
+    const byRoleRaw: Array<{ role: string; count: string }> =
+      await this.historyRepo
+        .createQueryBuilder('h')
+        .select('h.role', 'role')
+        .addSelect('COUNT(*)', 'count')
+        .where('h.userId = :userId', { userId })
+        .groupBy('h.role')
+        .getRawMany();
+
+    const byRole: Record<string, number> = {};
+    for (const row of byRoleRaw) {
+      byRole[row.role] = Number(row.count);
     }
+
+    const byGenreRaw: Array<{ genre: string; count: string }> =
+      await this.historyRepo
+        .createQueryBuilder('h')
+        .select('h.genre', 'genre')
+        .addSelect('COUNT(*)', 'count')
+        .where('h.userId = :userId', { userId })
+        .andWhere('h.genre IS NOT NULL')
+        .groupBy('h.genre')
+        .getRawMany();
+
+    const byGenre: Record<string, number> = {};
+    for (const row of byGenreRaw) {
+      byGenre[row.genre] = Number(row.count);
+    }
+
+    return { total, byRole, byGenre };
   }
 }
