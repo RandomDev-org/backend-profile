@@ -1,4 +1,12 @@
-import { IsString, IsEmail, IsArray, IsNotEmpty, ValidateNested, IsNumber, IsOptional } from 'class-validator';
+import {
+  IsString,
+  IsEmail,
+  IsArray,
+  IsNotEmpty,
+  ValidateNested,
+  IsNumber,
+  IsOptional,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class LocationDto {

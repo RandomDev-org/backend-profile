@@ -1,14 +1,34 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ProfileModule } from './profile/profile.module';
+import { ProfilesModule } from './profiles/profiles.module';
+import { HistoryModule } from './profiles/history/history.module';
 
 @Module({
-  imports: [ProfileModule],
+  imports: [
+    ConfigModule.forRoot(),
+    TypeOrmModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        type: 'postgres',
+        host: config.get<string>('DB_HOST', 'localhost'),
+        port: config.get<number>('DB_PORT', 5432),
+        username: config.get<string>('DB_USER', 'postgres'),
+        password: config.get<string>('DB_PASSWORD', 'postgres'),
+        database: config.get<string>('DB_NAME', 'profile_db'),
+        entities: [__dirname + '/**/*.entity{.ts,.js}'],
+        synchronize: config.get<string>('NODE_ENV') !== 'production',
+      }),
+    }),
+    ProfileModule,
+    ProfilesModule,
+    HistoryModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })
 export class AppModule {}
-
-

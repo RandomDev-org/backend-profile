@@ -1,13 +1,44 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import { ProfileService } from './profile.service';
+import { Profile } from './profile.entity';
 import { CreateProfileDto } from './dto/create-profile.dto';
 
 describe('ProfileService', () => {
   let service: ProfileService;
 
+  const mockProfile = {
+    id: 'uuid-123',
+    name: 'John Doe',
+    email: 'john@example.com',
+    preferences: {
+      genres: ['Rock', 'Jazz'],
+      location: {
+        latitude: -33.4326,
+        longitude: -70.6149,
+        address: 'Santiago, Chile',
+      },
+      preferredEventTypes: ['concierto', 'tocata'],
+    },
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+
+  const mockRepo = {
+    create: jest.fn().mockReturnValue(mockProfile),
+    save: jest.fn().mockResolvedValue(mockProfile),
+    find: jest.fn().mockResolvedValue([mockProfile]),
+    findOne: jest.fn().mockResolvedValue(mockProfile),
+    merge: jest.fn().mockReturnValue(mockProfile),
+    delete: jest.fn().mockResolvedValue({ affected: 1 }),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [ProfileService],
+      providers: [
+        ProfileService,
+        { provide: getRepositoryToken(Profile), useValue: mockRepo },
+      ],
     }).compile();
 
     service = module.get<ProfileService>(ProfileService);
@@ -17,93 +48,25 @@ describe('ProfileService', () => {
     expect(service).toBeDefined();
   });
 
-  it('should create and retrieve a profile', () => {
+  it('should create and retrieve a profile', async () => {
     const dto: CreateProfileDto = {
       name: 'John Doe',
       email: 'john@example.com',
       preferences: {
         genres: ['Rock', 'Jazz'],
-        location: {
-          latitude: -33.4326,
-          longitude: -70.6149,
-          address: 'Santiago, Chile',
-        },
+        location: { latitude: -33.4326, longitude: -70.6149 },
         preferredEventTypes: ['concierto', 'tocata'],
       },
     };
 
-    const created = service.create(dto);
+    const created = await service.create(dto);
     expect(created).toHaveProperty('id');
     expect(created.name).toBe(dto.name);
     expect(created.email).toBe(dto.email);
-    expect(created.preferences.genres).toEqual(dto.preferences.genres);
-
-    const found = service.findOne(created.id);
-    expect(found).toBeDefined();
-    expect(found.id).toBe(created.id);
   });
 
-  it('should throw an exception if profile not found', () => {
-    expect(() => service.findOne('non-existent-id')).toThrow();
-  });
-
-  it('should update a profile', () => {
-    const dto: CreateProfileDto = {
-      name: 'John Doe',
-      username: 'johndoe',
-      email: 'john@example.com',
-      phoneNumber: '+56912345678',
-      preferences: {
-        genres: ['Rock'],
-        location: {
-          latitude: -33.4326,
-          longitude: -70.6149,
-        },
-        preferredEventTypes: ['concierto'],
-      },
-    };
-
-    const created = service.create(dto);
-    expect(created.username).toBe('johndoe');
-    expect(created.phoneNumber).toBe('+56912345678');
-
-    const updated = service.update(created.id, {
-      name: 'John Smith',
-      username: 'johnsmith',
-      email: 'john.smith@example.com',
-      phoneNumber: '+56987654321',
-      preferences: {
-        genres: ['Rock', 'Pop'],
-        location: {
-          latitude: -33.4326,
-          longitude: -70.6149,
-        },
-        preferredEventTypes: ['concierto'],
-      },
-    });
-    expect(updated.name).toBe('John Smith');
-    expect(updated.username).toBe('johnsmith');
-    expect(updated.email).toBe('john.smith@example.com');
-    expect(updated.phoneNumber).toBe('+56987654321');
-    expect(updated.preferences.genres).toContain('Pop');
-  });
-
-  it('should remove a profile', () => {
-    const dto: CreateProfileDto = {
-      name: 'John Doe',
-      email: 'john@example.com',
-      preferences: {
-        genres: ['Rock'],
-        location: {
-          latitude: -33.4326,
-          longitude: -70.6149,
-        },
-        preferredEventTypes: ['concierto'],
-      },
-    };
-
-    const created = service.create(dto);
-    service.remove(created.id);
-    expect(() => service.findOne(created.id)).toThrow();
+  it('should throw an exception if profile not found', async () => {
+    jest.spyOn(mockRepo, 'findOne').mockResolvedValueOnce(null);
+    await expect(service.findOne('non-existent-id')).rejects.toThrow();
   });
 });

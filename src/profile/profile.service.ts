@@ -1,63 +1,47 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { Profile } from './profile.entity';
 import { CreateProfileDto } from './dto/create-profile.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
-import { randomUUID } from 'crypto';
 
 @Injectable()
 export class ProfileService {
-  private profiles: Map<string, Profile> = new Map();
+  constructor(
+    @InjectRepository(Profile)
+    private readonly profileRepo: Repository<Profile>,
+  ) {}
 
-  create(createProfileDto: CreateProfileDto): Profile {
-    const id = randomUUID();
-    const now = new Date();
-    const profile: Profile = {
-      id,
-      ...createProfileDto,
-      createdAt: now,
-      updatedAt: now,
-    };
-    this.profiles.set(id, profile);
-    return profile;
+  create(createProfileDto: CreateProfileDto): Promise<Profile> {
+    const profile = this.profileRepo.create(createProfileDto);
+    return this.profileRepo.save(profile);
   }
 
-  findAll(): Profile[] {
-    return Array.from(this.profiles.values());
+  findAll(): Promise<Profile[]> {
+    return this.profileRepo.find({ order: { createdAt: 'DESC' } });
   }
 
-  findOne(id: string): Profile {
-    const profile = this.profiles.get(id);
+  async findOne(id: string): Promise<Profile> {
+    const profile = await this.profileRepo.findOne({ where: { id } });
     if (!profile) {
       throw new NotFoundException(`Profile with ID ${id} not found`);
     }
     return profile;
   }
 
-  update(id: string, updateProfileDto: UpdateProfileDto): Profile {
-    const profile = this.findOne(id);
-    const updatedProfile: Profile = {
-      ...profile,
-      ...updateProfileDto,
-      preferences: updateProfileDto.preferences
-        ? {
-            ...profile.preferences,
-            ...updateProfileDto.preferences,
-            location: updateProfileDto.preferences.location
-              ? {
-                  ...profile.preferences.location,
-                  ...updateProfileDto.preferences.location,
-                }
-              : profile.preferences.location,
-          }
-        : profile.preferences,
-      updatedAt: new Date(),
-    };
-    this.profiles.set(id, updatedProfile);
-    return updatedProfile;
+  async update(
+    id: string,
+    updateProfileDto: UpdateProfileDto,
+  ): Promise<Profile> {
+    const profile = await this.findOne(id);
+    const merged = this.profileRepo.merge(profile, updateProfileDto);
+    return this.profileRepo.save(merged);
   }
 
-  remove(id: string): void {
-    const profile = this.findOne(id);
-    this.profiles.delete(profile.id);
+  async remove(id: string): Promise<void> {
+    const result = await this.profileRepo.delete(id);
+    if (result.affected === 0) {
+      throw new NotFoundException(`Profile with ID ${id} not found`);
+    }
   }
 }

@@ -1,3 +1,11 @@
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+} from 'typeorm';
+
 export interface ProfilePreferences {
   genres: string[];
   location: {
@@ -8,13 +16,29 @@ export interface ProfilePreferences {
   preferredEventTypes: string[];
 }
 
+@Entity()
 export class Profile {
+  @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  @Column()
   name: string;
-  username?: string;
+
+  @Column({ nullable: true })
+  username: string;
+
+  @Column()
   email: string;
-  phoneNumber?: string;
+
+  @Column({ nullable: true })
+  phoneNumber: string;
+
+  @Column({ type: 'simple-json' })
   preferences: ProfilePreferences;
+
+  @CreateDateColumn()
   createdAt: Date;
+
+  @UpdateDateColumn()
   updatedAt: Date;
 }
