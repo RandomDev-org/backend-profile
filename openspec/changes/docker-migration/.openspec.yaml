@@ -1,0 +1,11 @@
+schema: spec-driven
+created: 2026-06-22
+proposal: |
+  Migrar backend-profile a Docker para entorno reproducible.
+  Se agrega Dockerfile optimizado y .dockerignore.
+tasks:
+  - feat: add Dockerfile for NestJS hybrid service (HTTP + TCP)
+  - feat: add .dockerignore
+specs:
+  - Container must expose HTTP port 3000 and TCP port 4002
+  - Must connect to PostgreSQL via docker-compose service name
