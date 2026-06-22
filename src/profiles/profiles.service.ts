@@ -1,79 +1,47 @@
-import {
-  Injectable,
-  Inject,
-  NotFoundException,
-  RequestTimeoutException,
-} from '@nestjs/common';
-import { ClientProxy } from '@nestjs/microservices';
-import {
-  lastValueFrom,
-  timeout,
-  catchError,
-  throwError,
-  TimeoutError,
-} from 'rxjs';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { UserPreference } from './entities/user-preference.entity';
 import { UpdatePreferencesDto } from './dto/update-preferences.dto';
-
-export interface UserPreferences {
-  userId: string;
-  preferredGenres?: string[];
-  preferredLocation?: string;
-  latitude?: number;
-  longitude?: number;
-  preferredEventTypes?: string[];
-}
 
 @Injectable()
 export class ProfilesService {
   constructor(
-    @Inject('MAPS_SERVICE')
-    private readonly mapsClient: ClientProxy,
+    @InjectRepository(UserPreference)
+    private readonly preferenceRepo: Repository<UserPreference>,
   ) {}
 
-  async getPreferences(userId: string): Promise<UserPreferences> {
-    try {
-      const prefs = await lastValueFrom(
-        this.mapsClient
-          .send<UserPreferences>({ cmd: 'get_preferences' }, { userId })
-          .pipe(
-            timeout(5000),
-            catchError((err: unknown) => throwError(() => err)),
-          ),
-      );
-      if (!prefs) {
-        throw new NotFoundException(`Preferences not found for user ${userId}`);
-      }
-      return prefs;
-    } catch (err) {
-      if (err instanceof NotFoundException) throw err;
-      if (err instanceof TimeoutError) {
-        throw new RequestTimeoutException('Maps service unavailable');
-      }
-      throw err;
+  async getPreferences(userId: string): Promise<UserPreference> {
+    const prefs = await this.preferenceRepo.findOne({ where: { userId } });
+    if (!prefs) {
+      throw new NotFoundException(`Preferences not found for user ${userId}`);
     }
+    return prefs;
   }
 
   async updatePreferences(
     userId: string,
     dto: UpdatePreferencesDto,
-  ): Promise<UserPreferences> {
-    try {
-      return await lastValueFrom(
-        this.mapsClient
-          .send<UserPreferences>(
-            { cmd: 'upsert_preferences' },
-            { userId, ...dto },
-          )
-          .pipe(
-            timeout(5000),
-            catchError((err: unknown) => throwError(() => err)),
-          ),
-      );
-    } catch (err) {
-      if (err instanceof TimeoutError) {
-        throw new RequestTimeoutException('Maps service unavailable');
-      }
-      throw err;
+  ): Promise<UserPreference> {
+    let prefs = await this.preferenceRepo.findOne({ where: { userId } });
+    if (!prefs) {
+      prefs = this.preferenceRepo.create({ userId });
     }
+    if (dto.preferredGenres !== undefined) {
+      prefs.preferredGenres = dto.preferredGenres;
+    }
+    if (dto.preferredLocation !== undefined) {
+      prefs.preferredLocation = dto.preferredLocation;
+    }
+    if (dto.latitude !== undefined) {
+      prefs.latitude = dto.latitude;
+    }
+    if (dto.longitude !== undefined) {
+      prefs.longitude = dto.longitude;
+    }
+    if (dto.preferredEventTypes !== undefined) {
+      prefs.preferredEventTypes = dto.preferredEventTypes;
+    }
+    return this.preferenceRepo.save(prefs);
   }
 }

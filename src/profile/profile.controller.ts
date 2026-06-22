@@ -40,7 +40,7 @@ export class ProfileController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  remove(@Param('id') id: string) {
-    this.profileService.remove(id);
+  async remove(@Param('id') id: string) {
+    await this.profileService.remove(id);
   }
 }

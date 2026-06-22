@@ -1,45 +1,45 @@
-# feat: módulo de historial de eventos para perfiles
+# feat: base de datos compartida para todo el microservicio de perfiles
 
 ## Descripción
 
-Nuevo módulo `HistoryModule` dentro del microservicio de perfiles. Permite registrar y consultar el historial de eventos a los que un usuario ha asistido y eventos que ha realizado (como organizador o performer).
+Se implementó una base de datos **PostgreSQL compartida** para todos los módulos del microservicio de perfiles, reemplazando:
+- Almacenamiento en memoria (`ProfileModule` → `Map<string, Profile>`)
+- Delegación vía TCP a maps service (`ProfilesModule` → `ClientProxy MAPS_SERVICE`)
 
-## Endpoints
+## Cambios por módulo
 
-### HTTP (desarrollo local)
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| `GET` | `/history/:userId` | Lista historial con filtros (`role`, `genre`, `from`, `to`, paginación) |
-| `POST` | `/history/:userId` | Agrega una entrada al historial |
-| `DELETE` | `/history/:userId/:entryId` | Elimina una entrada del historial |
-| `GET` | `/history/:userId/stats` | Estadísticas: totales por rol y género |
+### ProfileModule (perfiles)
+- `Profile` convertido de clase TypeScript a **entidad TypeORM** con `@Entity()`
+- `ProfileService` ahora usa `@InjectRepository(Profile)` en lugar de un `Map` en memoria
+- `preferences` se almacena como `simple-json` en PostgreSQL
 
-### TCP (API Gateway)
-| Pattern | Payload | Descripción |
-|---------|---------|-------------|
-| `{ cmd: 'get_user_history' }` | `{ userId, role?, genre?, from?, to?, page?, limit? }` | Lista historial |
-| `{ cmd: 'add_history_entry' }` | `{ userId, eventId, role, notes? }` | Agrega entrada |
-| `{ cmd: 'delete_history_entry' }` | `{ userId, entryId }` | Elimina entrada |
-| `{ cmd: 'get_user_history_stats' }` | `{ userId }` | Estadísticas |
+### ProfilesModule (preferencias de usuario)
+- Nueva entidad `UserPreference` con campos: `userId`, `preferredGenres`, `preferredLocation`, `latitude`, `longitude`, `preferredEventTypes`
+- `ProfilesService` ahora usa `@InjectRepository(UserPreference)` en lugar de TCP a MAPS_SERVICE
+- Se eliminó `ClientsModule` (ya no depende de maps service para preferencias)
 
-## Estructura
+### HistoryModule (historial de eventos)
+- Sin cambios funcionales, ya usaba TypeORM
+- Ahora comparte la misma conexión PostgreSQL que el resto del microservicio
 
-```
-src/profiles/history/
-├── dto/
-│   ├── create-history-entry.dto.ts
-│   └── history-query.dto.ts
-├── history.controller.ts   # HTTP + @MessagePattern TCP
-├── history.service.ts      # Envía commands TCP a MAPS_SERVICE
-└── history.module.ts       # Cliente TCP para maps (misma config que profiles)
-```
-
-## Arquitectura
+## Estructura de la base de datos
 
 ```
-API Gateway (TCP) ←→ Profile Service (TCP:4002) ←→ Maps Service (TCP:4001)
-                         ↕
-                   HTTP :3000 (dev)
+Tablas en PostgreSQL (profile_db):
+├── profile              # Perfiles de usuario (CRUD)
+├── user_preference     # Preferencias de usuario (géneros, ubicación, tipos)
+└── history_entry       # Historial de eventos del usuario
 ```
 
-El módulo `HistoryModule` sigue el mismo patrón que `ProfilesModule`: expone endpoints HTTP para desarrollo y handlers TCP para el API Gateway, delegando la persistencia al microservicio **maps** mediante `ClientProxy`.
+## Variables de entorno
+
+| Variable | Default | Descripción |
+|----------|---------|-------------|
+| `PORT` | `3000` | Puerto HTTP local |
+| `PROFILES_HOST` | `0.0.0.0` | Host TCP |
+| `PROFILES_TCP_PORT` | `4002` | Puerto TCP para API Gateway |
+| `DB_HOST` | `localhost` | Host PostgreSQL |
+| `DB_PORT` | `5432` | Puerto PostgreSQL |
+| `DB_USER` | `postgres` | Usuario PostgreSQL |
+| `DB_PASSWORD` | `postgres` | Contraseña PostgreSQL |
+| `DB_NAME` | `profile_db` | Nombre de base de datos |
