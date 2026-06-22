@@ -26,14 +26,14 @@ export interface UserPreferences {
 @Injectable()
 export class ProfilesService {
   constructor(
-    @Inject('DB_SERVICE')
-    private readonly dbClient: ClientProxy,
+    @Inject('MAPS_SERVICE')
+    private readonly mapsClient: ClientProxy,
   ) {}
 
   async getPreferences(userId: string): Promise<UserPreferences> {
     try {
       const prefs = await lastValueFrom(
-        this.dbClient
+        this.mapsClient
           .send<UserPreferences>({ cmd: 'get_preferences' }, { userId })
           .pipe(
             timeout(5000),
@@ -47,7 +47,7 @@ export class ProfilesService {
     } catch (err) {
       if (err instanceof NotFoundException) throw err;
       if (err instanceof TimeoutError) {
-        throw new RequestTimeoutException('DB service unavailable');
+        throw new RequestTimeoutException('Maps service unavailable');
       }
       throw err;
     }
@@ -59,7 +59,7 @@ export class ProfilesService {
   ): Promise<UserPreferences> {
     try {
       return await lastValueFrom(
-        this.dbClient
+        this.mapsClient
           .send<UserPreferences>(
             { cmd: 'upsert_preferences' },
             { userId, ...dto },
@@ -71,7 +71,7 @@ export class ProfilesService {
       );
     } catch (err) {
       if (err instanceof TimeoutError) {
-        throw new RequestTimeoutException('DB service unavailable');
+        throw new RequestTimeoutException('Maps service unavailable');
       }
       throw err;
     }
