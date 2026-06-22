@@ -23,21 +23,21 @@ La comunicación entre microservicios se realiza mediante **TCP** (NestJS micros
 ## Arquitectura
 
 ```
-API Gateway (TCP) ←→ Profile Service (TCP:4002) ←→ DB Service (TCP:4003)
+API Gateway (TCP) ←→ Profile Service (TCP:4002) ←→ Maps Service (TCP:4001)
                          ↕
                    HTTP :3000 (dev)
 ```
 
 - **Profile Service** recibe mensajes TCP desde el Gateway y responde vía TCP
-- Para persistencia, envía mensajes TCP al **DB Service** (`{ cmd: 'get_preferences' }` / `{ cmd: 'upsert_preferences' }`)
-- Variables de entorno: `PROFILES_TCP_PORT`, `DB_SERVICE_HOST`, `DB_SERVICE_PORT`
+- Para persistencia, envía mensajes TCP al **Maps Service** (`{ cmd: 'get_preferences' }` / `{ cmd: 'upsert_preferences' }`), que maneja PostgreSQL
+- Variables de entorno: `PROFILES_TCP_PORT`, `MAPS_HOST`, `MAPS_TCP_PORT`
 
 ## Cómo ejecutar
 
 ```bash
 npm install
 npm run build
-# Iniciar (requiere DB Service corriendo en TCP:4003)
+# Iniciar (requiere Maps Service corriendo en TCP:4001)
 npm run start:dev
 ```
 
@@ -48,5 +48,5 @@ npm run start:dev
 | `PORT` | `3000` | Puerto HTTP local |
 | `PROFILES_HOST` | `0.0.0.0` | Host TCP |
 | `PROFILES_TCP_PORT` | `4002` | Puerto TCP para Gateway |
-| `DB_SERVICE_HOST` | `localhost` | Host del DB Service |
-| `DB_SERVICE_PORT` | `4003` | Puerto del DB Service |
+| `MAPS_HOST` | `localhost` | Host del Maps Service |
+| `MAPS_TCP_PORT` | `4001` | Puerto TCP del Maps Service |
